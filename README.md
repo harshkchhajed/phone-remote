@@ -4,6 +4,15 @@ Control an Ubuntu laptop from your phone's browser over home Wi-Fi: trackpad, ke
 
 The laptop side is one small Python server (`aiohttp`) that fakes mouse and keyboard input through X11's XTest extension.
 
+Use it when the laptop is plugged into a TV or monitor across the room: move the pointer, type, control playback, switch between open apps, pass links and photos back and forth, and shut the laptop down when you're done, all from the couch.
+
+<p align="center">
+  <img src="docs/remote.png" width="280" alt="Main screen: four app tiles, a large trackpad, mouse buttons, media keys and a keyboard row">
+  &nbsp;&nbsp;
+  <img src="docs/share.png" width="280" alt="Share sheet: text sent from the laptop with a Copy button, and buttons to send the phone clipboard or photos and files to the laptop">
+</p>
+<p align="center"><sub>Left: the remote. Right: the Share sheet, with text sent from the laptop by Alt+C.</sub></p>
+
 ## Features
 
 - **Trackpad**: one finger moves, tap clicks, two-finger tap right-clicks, two fingers scroll, hold then move drags. A thumb-wheel strip scrolls sideways.
