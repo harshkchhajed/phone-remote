@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Laptop Remote">
+<meta name="theme-color" content="#121019">
+<link rel="apple-touch-icon" href="/static/icon-180.png">
+<link rel="manifest" href="/static/manifest.json">
+<title>Laptop Remote</title>
+<style>
+  :root {
+    --bg: #121019; --panel: #1d1a27; --panel-2: #262233; --line: #34304a;
+    --text: #eeecf5; --muted: #9a95ad; --accent: #8b6cff; --accent-2: #b39dff;
+    --ok: #3ccf91; --warn: #f2b84b; --bad: #ff6b7a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 15px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
+  body { display: flex; flex-direction: column; padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom); }
+  header { display: flex; align-items: center; gap: 10px; padding: 12px 4px 10px; }
+  header h1 { font-size: 17px; margin: 0; flex: 1; font-weight: 650; letter-spacing: .2px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 8px currentColor; color: var(--warn); }
+  .dot.ok { background: var(--ok); color: var(--ok); }
+  .dot.bad { background: var(--bad); color: var(--bad); }
+  #status { color: var(--muted); font-size: 13px; }
+  button { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 12px; padding: 10px 12px; touch-action: manipulation; }
+  button:active { background: var(--line); }
+  button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .icon-btn { padding: 7px 11px; font-size: 14px; }
+  .hidden { display: none !important; }
+
+  #apps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  .app { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 8px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; min-width: 0; }
+  .app img, .app .letter { width: 40px; height: 40px; border-radius: 10px; object-fit: contain; }
+  .app .letter { display: grid; place-items: center; background: var(--accent); font-weight: 700; font-size: 18px; }
+  .app span { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  body.editing .app { border-color: var(--accent); border-style: dashed; }
+
+  #pad { flex: 1; min-height: 200px; border-radius: 18px; background:
+      radial-gradient(circle at 50% 40%, #241f35 0%, var(--panel) 70%);
+    border: 1px solid var(--line); position: relative; touch-action: none; overflow: hidden; }
+  #pad .hint { position: absolute; inset: auto 0 12px; text-align: center; color: var(--muted); font-size: 12px; pointer-events: none; }
+  #pad.drag { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+  #wheel { height: 44px; margin-top: 8px; border-radius: 14px; border: 1px solid var(--line); touch-action: none;
+    background: repeating-linear-gradient(90deg, var(--panel) 0 10px, var(--panel-2) 10px 12px);
+    display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+  .mouse { display: grid; grid-template-columns: 0.7fr 1fr 1fr 0.7fr; gap: 8px; margin: 8px 0; }
+  .mouse button { padding: 14px 6px; border-radius: 14px; }
+  .media { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 8px; }
+  .media button { padding: 11px 0; font-size: 17px; }
+
+  .row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+  .row::-webkit-scrollbar { display: none; }
+  .row button { flex: 0 0 auto; padding: 9px 12px; font-size: 14px; }
+  #kbd-bar { display: flex; gap: 8px; margin-bottom: 8px; }
+  #kbd-bar button { flex: 1; white-space: nowrap; padding: 10px 6px; }
+  #sink { position: fixed; left: -1000px; top: 0; width: 10px; height: 10px; opacity: 0; }
+
+  .screen { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 0 8px 40px; }
+  .screen h2 { margin: 0; font-size: 24px; }
+  .screen p { margin: 0; color: var(--muted); }
+  input[type=text], input[type=search], input[inputmode=numeric] {
+    font: inherit; font-size: 17px; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 13px 14px; width: 100%; -webkit-user-select: text; user-select: text; }
+  #code { font-size: 28px; letter-spacing: 10px; text-align: center; }
+  .primary { background: var(--accent); border-color: var(--accent); color: #fff; padding: 14px; font-weight: 600; }
+  .err { color: var(--bad); min-height: 20px; }
+  .tip { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; color: var(--muted); font-size: 13px; }
+
+  #sheet, #winsheet, #powersheet, #sharesheet { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; z-index: 10; }
+  #sheet .box, #winsheet .box, #powersheet .box, #sharesheet .box { background: var(--panel); width: 100%; max-height: 75%; border-radius: 18px 18px 0 0; padding: 14px 12px calc(14px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 10px; }
+  #sheet ul, #winsheet ul, #powersheet ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+  #sheet li, #winsheet li, #powersheet li { padding: 12px 8px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  #sheet li img, #sheet li .letter, #winsheet li img, #winsheet li .letter, #powersheet li img, #powersheet li .letter { width: 28px; height: 28px; object-fit: contain; }
+  #sheet li .letter, #winsheet li .letter, #powersheet li .letter { display: grid; place-items: center; border-radius: 7px; background: var(--accent); font-weight: 700; font-size: 14px; }
+  #winsheet li span { min-width: 0; display: flex; flex-direction: column; }
+  #winsheet li .x { margin-left: auto; flex: 0 0 auto; padding: 6px 12px; color: var(--bad); }
+  #winsheet li small { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #sharesheet .box { overflow-y: auto; }
+  .sect { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-top: 4px; }
+  .card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .card .empty { color: var(--muted); font-size: 13px; }
+  .cliptext { max-height: 130px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; font-size: 14px; -webkit-user-select: text; user-select: text; }
+  .card img { max-width: 100%; max-height: 180px; object-fit: contain; border-radius: 8px; align-self: center; }
+  .card .btns { display: flex; gap: 8px; }
+  .card .btns button { flex: 1; }
+  .frow { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .frow span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .frow small { color: var(--muted); }
+  #paste-box { font: inherit; font-size: 16px; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 10px; width: 100%; min-height: 70px; -webkit-user-select: text; user-select: text; }
+  #toast { position: fixed; left: 12px; right: 12px; top: calc(env(safe-area-inset-top) + 8px); z-index: 20; background: var(--accent);
+    color: #fff; border-radius: 14px; padding: 12px 14px; font-size: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.4);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .danger { background: var(--bad); border-color: var(--bad); color: #fff; padding: 14px; font-weight: 600; }
+  #settings label { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="dot" id="dot"></div>
+  <h1 id="title">Laptop Remote</h1>
+  <span id="status">Connecting…</span>
+  <button class="icon-btn hidden" id="edit-btn" aria-label="Change apps">Edit</button>
+  <button class="icon-btn hidden" id="power-btn" aria-label="Shut down laptop" style="color:var(--bad)">⏻</button>
+</header>
+
+<!-- Pairing -->
+<section class="screen hidden" id="pair">
+  <h2>Pair this phone</h2>
+  <p id="pair-msg">One time only. After this, opening the remote connects automatically.</p>
+  <div class="tip" id="cert-tip"><b>Step 1, once:</b> trust this laptop. <a href="/ca.crt" style="color:var(--accent-2)">Download the certificate</a> and tap Allow. Then open Settings → <b>Profile Downloaded</b> → Install. Then Settings → General → About → <b>Certificate Trust Settings</b> → turn on “Phone Remote CA”. Reload this page: the “Not Private” warning should be gone.</div>
+  <div class="tip hidden" id="a2hs">Tip: pair from the Home Screen app, not a Safari tab. In Safari, tap Share → <b>Add to Home Screen</b>, open “Laptop Remote” from there, then pair. Safari tabs and Home Screen apps keep separate logins.</div>
+  <div id="step1">
+    <input type="text" id="devname" placeholder="Device name" value="iPhone" maxlength="40">
+    <div style="height:10px"></div>
+    <button class="primary" id="pair-start" style="width:100%">Pair</button>
+  </div>
+  <div id="step2" class="hidden">
+    <p>A 6-digit code just popped up on the laptop screen. Enter it here.</p>
+    <p id="sent-at"></p>
+    <div style="height:10px"></div>
+    <input inputmode="numeric" pattern="[0-9]*" id="code" maxlength="6" autocomplete="off">
+    <div style="height:10px"></div>
+    <button class="primary" id="pair-finish" style="width:100%">Connect</button>
+  </div>
+  <div class="err" id="pair-err"></div>
+</section>
+
+<!-- Remote -->
+<main id="remote" class="hidden" style="flex:1;display:flex;flex-direction:column;min-height:0">
+  <div id="apps"></div>
+  <div id="pad"><div class="hint">1 finger: move · tap: click · 2-finger tap: right-click<br>2 fingers: scroll · hold then move: drag</div></div>
+  <div id="wheel">⟷ thumb wheel: swipe to scroll sideways</div>
+  <div class="mouse">
+    <button id="back" aria-label="Back">◀ Back</button>
+    <button id="lclick">Left</button>
+    <button id="rclick">Right</button>
+    <button id="fwd" aria-label="Forward">Fwd ▶</button>
+  </div>
+  <div class="media">
+    <button data-k="prev" aria-label="Previous">⏮</button><button data-k="playpause" aria-label="Play/Pause">⏯</button>
+    <button data-k="next" aria-label="Next">⏭</button><button data-k="voldown" aria-label="Volume down">🔉</button>
+    <button data-k="mute" aria-label="Mute">🔇</button><button data-k="volup" aria-label="Volume up">🔊</button>
+    <button data-k="f" aria-label="Fullscreen">⛶</button>
+  </div>
+  <div id="kbd-bar">
+    <button id="kbd-btn">⌨︎ Keyboard</button>
+    <button id="win-btn">▤ Apps</button>
+    <button id="share-btn">⇅ Share</button>
+    <button id="settings-btn" style="flex:0 0 auto">⚙︎</button>
+  </div>
+  <div class="row" id="mods">
+    <button data-mod="ctrl">Ctrl</button><button data-mod="alt">Alt</button>
+    <button data-mod="shift">Shift</button>
+    <button data-k="esc">Esc</button><button data-k="tab">Tab</button>
+    <button data-k="enter">Enter</button><button data-k="backspace">⌫</button>
+    <button data-k="left">←</button><button data-k="up">↑</button><button data-k="down">↓</button><button data-k="right">→</button>
+  </div>
+  <textarea id="sink" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+</main>
+
+<!-- App picker -->
+<div id="sheet" class="hidden">
+  <div class="box">
+    <div style="display:flex;gap:8px;align-items:center"><b style="flex:1" id="sheet-title">Replace app</b><button class="icon-btn" id="sheet-close">Done</button></div>
+    <input type="search" id="search" placeholder="Search apps">
+    <ul id="applist"></ul>
+  </div>
+</div>
+
+<!-- Open windows -->
+<div id="winsheet" class="hidden">
+  <div class="box">
+    <div style="display:flex;gap:8px;align-items:center"><b style="flex:1">Open apps</b><button class="icon-btn" id="win-close">Done</button></div>
+    <ul id="winlist"></ul>
+  </div>
+</div>
+
+<!-- Clipboard and files -->
+<div id="sharesheet" class="hidden">
+  <div class="box">
+    <div style="display:flex;gap:8px;align-items:center"><b style="flex:1">Share with laptop</b><button class="icon-btn" id="share-close">Done</button></div>
+    <div class="sect">From laptop</div>
+    <div class="card" id="inbox"></div>
+    <div class="sect">To laptop</div>
+    <button id="paste-to-pc">📋 Send phone clipboard</button>
+    <div id="paste-fallback" class="hidden" style="display:flex;flex-direction:column;gap:8px">
+      <textarea id="paste-box" placeholder="Paste here (tap and hold, Paste)"></textarea>
+      <button id="paste-send" class="primary">Send to laptop clipboard</button>
+    </div>
+    <button id="pick-files">🖼 Send photos or files</button>
+    <input type="file" id="file-in" multiple class="hidden">
+    <div id="share-msg" style="color:var(--muted);font-size:13px;min-height:18px"></div>
+  </div>
+</div>
+<div id="toast" class="hidden"></div>
+
+<!-- Shut down -->
+<div id="powersheet" class="hidden">
+  <div class="box">
+    <b>Close all apps and shut down?</b>
+    <p id="power-msg" style="margin:0;color:var(--muted)"></p>
+    <button id="power-go" class="danger">Shut down</button>
+    <button id="power-cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- Settings -->
+<div id="settings" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;z-index:10">
+  <div class="box" style="background:var(--panel);width:100%;border-radius:18px 18px 0 0;padding:16px 14px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px">
+    <b>Settings</b>
+    <label>Pointer speed <input type="range" id="speed" min="0.5" max="3" step="0.1"></label>
+    <label>Scroll speed <input type="range" id="sspeed" min="0.3" max="3" step="0.1"></label>
+    <label>Natural scrolling <input type="checkbox" id="natural"></label>
+    <button id="unpair" style="color:var(--bad)">Unpair this phone</button>
+    <button id="settings-close" class="primary">Done</button>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+let token = store.get("pr_token", "");
+let ws = null, retry = 0, retryTimer = null;
+let apps = [], slots = [], editing = false, pickSlot = -1;
+const prefs = {
+  speed: parseFloat(store.get("pr_speed", "1.4")),
+  sspeed: parseFloat(store.get("pr_sspeed", "1")),
+  natural: store.get("pr_natural", "1") === "1",
+};
+
+function setStatus(state, text) {
+  $("dot").className = "dot " + (state || "");
+  $("status").textContent = text;
+}
+function show(which) {
+  $("pair").classList.toggle("hidden", which !== "pair");
+  $("remote").classList.toggle("hidden", which !== "remote");
+  $("edit-btn").classList.toggle("hidden", which !== "remote");
+  $("power-btn").classList.toggle("hidden", which !== "remote");
+}
+function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
+
+// ---------- connection ----------
+function connect() {
+  clearTimeout(retryTimer);
+  if (!token) { show("pair"); setStatus("", "Not paired"); return; }
+  if (ws && (ws.readyState === 0 || ws.readyState === 1)) return;
+  show("remote");
+  setStatus("", "Connecting…");
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+  ws.onopen = () => ws.send(JSON.stringify({ t: "auth", token }));
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.t === "outbox") onOutbox(m.item);
+    else if (m.t === "ready") { retry = 0; setStatus("ok", "Connected"); $("title").textContent = m.host; loadApps(); }
+    else if (m.t === "unauthorized") { token = ""; store.del("pr_token"); ws.onclose = null; ws.close(); connect(); }
+  };
+  ws.onclose = () => {
+    setStatus("bad", "Reconnecting…");
+    retryTimer = setTimeout(connect, Math.min(5000, 500 * 2 ** retry++));
+  };
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { retry = 0; connect(); } });
+window.addEventListener("pageshow", () => connect());
+
+// ---------- pairing ----------
+let pairId = null;
+if (!navigator.standalone && /iPhone|iPad/.test(navigator.userAgent)) $("a2hs").classList.remove("hidden");
+$("pair-start").onclick = async () => {
+  $("pair-err").textContent = "";
+  try {
+    const r = await fetch("/api/pair/start", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: $("devname").value || "iPhone" }) });
+    const j = await r.json();
+    pairId = j.id;
+    $("sent-at").textContent = "Use the code in the notification marked “sent " + new Date().toTimeString().slice(0, 8) + "”.";
+    $("step1").classList.add("hidden"); $("step2").classList.remove("hidden");
+    $("code").value = ""; $("code").focus();
+  } catch { $("pair-err").textContent = "Can't reach the laptop. Same Wi-Fi? Service running?"; }
+};
+$("pair-finish").onclick = async () => {
+  $("pair-err").textContent = "";
+  const r = await fetch("/api/pair/finish", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: pairId, code: $("code").value }) });
+  const j = await r.json();
+  if (j.token) { token = j.token; store.set("pr_token", token); $("step2").classList.add("hidden"); $("step1").classList.remove("hidden"); connect(); return; }
+  $("pair-err").textContent = j.error || "Pairing failed.";
+  $("code").value = "";
+  if (r.status === 410) { $("step2").classList.add("hidden"); $("step1").classList.remove("hidden"); }
+};
+$("code").addEventListener("input", () => { if ($("code").value.length === 6) $("pair-finish").click(); });
+
+// ---------- apps ----------
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify(body) }
+                                    : { headers: { Authorization: "Bearer " + token } });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+function iconEl(app, cls) {
+  const img = document.createElement("img");
+  img.src = "/api/icon/" + encodeURIComponent(app.id);
+  img.alt = "";
+  img.onerror = () => {
+    const d = document.createElement("div");
+    d.className = "letter"; d.textContent = (app.name || "?")[0].toUpperCase();
+    img.replaceWith(d);
+  };
+  return img;
+}
+async function loadApps() {
+  try { const j = await api("/api/apps"); apps = j.apps; slots = j.slots; renderApps(); } catch {}
+}
+function renderApps() {
+  const box = $("apps"); box.innerHTML = "";
+  slots.forEach((s, i) => {
+    const b = document.createElement("button"); b.className = "app";
+    b.appendChild(iconEl(s));
+    const n = document.createElement("span"); n.textContent = s.name; b.appendChild(n);
+    b.onclick = () => editing ? openPicker(i) : send({ t: "launch", id: s.id });
+    box.appendChild(b);
+  });
+}
+$("edit-btn").onclick = () => {
+  editing = !editing;
+  document.body.classList.toggle("editing", editing);
+  $("edit-btn").textContent = editing ? "Done" : "Edit";
+  $("edit-btn").classList.toggle("on", editing);
+};
+function openPicker(i) {
+  pickSlot = i;
+  $("sheet-title").textContent = "Replace “" + slots[i].name + "”";
+  $("search").value = ""; renderList("");
+  $("sheet").classList.remove("hidden");
+}
+function renderList(q) {
+  const ul = $("applist"); ul.innerHTML = "";
+  apps.filter(a => a.name.toLowerCase().includes(q.toLowerCase())).forEach(a => {
+    const li = document.createElement("li");
+    li.appendChild(iconEl(a));
+    const t = document.createElement("span"); t.textContent = a.name; li.appendChild(t);
+    li.onclick = async () => { await api("/api/slots", { slot: pickSlot, id: a.id }); $("sheet").classList.add("hidden"); loadApps(); };
+    ul.appendChild(li);
+  });
+}
+$("search").oninput = (e) => renderList(e.target.value);
+$("sheet-close").onclick = () => $("sheet").classList.add("hidden");
+
+// ---------- open windows ----------
+async function loadWindows() {
+  const ul = $("winlist"); ul.innerHTML = "";
+  let wins = [];
+  try { wins = (await api("/api/windows")).windows; } catch { ul.innerHTML = "<li>Can't reach the laptop.</li>"; return; }
+  if (!wins.length) ul.innerHTML = "<li>No apps open.</li>";
+  wins.forEach(w => {
+    const li = document.createElement("li");
+    li.appendChild(iconEl({ id: w.app || "", name: w.name }));
+    const t = document.createElement("span");
+    const b = document.createElement("b"); b.textContent = w.name;
+    const s = document.createElement("small"); s.textContent = w.title;
+    t.append(b, s); li.appendChild(t);
+    li.onclick = async () => { $("winsheet").classList.add("hidden"); try { await api("/api/windows/activate", { id: w.id }); } catch {} };
+    const x = document.createElement("button"); x.className = "x"; x.textContent = "✕"; x.setAttribute("aria-label", "Close " + w.name);
+    x.onclick = async (e) => {
+      e.stopPropagation(); x.disabled = true;
+      try { await api("/api/windows/close", { id: w.id }); } catch {}
+      // The app may ask "save changes?" on the laptop, so re-read instead of assuming it closed.
+      setTimeout(loadWindows, 1200);
+    };
+    li.appendChild(x);
+    ul.appendChild(li);
+  });
+}
+$("win-btn").onclick = () => { $("winsheet").classList.remove("hidden"); loadWindows(); };
+$("win-close").onclick = () => $("winsheet").classList.add("hidden");
+
+// ---------- clipboard and files ----------
+// Laptop -> phone: Alt+C on the laptop pushes {"t": "outbox"}. iOS only lets a page write the clipboard or open the
+// share sheet during a tap, so files are downloaded as soon as they arrive and the tap just hands them over.
+let outbox = null, outFiles = [];
+function fmtSize(n) { return n < 1024 ? n + " B" : n < 1 << 20 ? (n / 1024).toFixed(0) + " KB" : (n / 1048576).toFixed(1) + " MB"; }
+function shareMsg(t) { $("share-msg").textContent = t; }
+function onOutbox(item) {
+  if (outbox && outbox.id === item.id) return;
+  outbox = item;
+  outFiles = (item.files || []).map((f, i) => fetch(`/api/outbox/${item.id}/${i}`, { headers: { Authorization: "Bearer " + token } })
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.blob(); })
+    .then(b => new File([b], f.name, { type: b.type || "application/octet-stream" })));
+  outFiles.forEach(p => p.catch(() => {}));
+  renderInbox();
+  if (store.get("pr_seen", "") !== item.id && $("sharesheet").classList.contains("hidden")) {
+    const what = item.kind === "text" ? "“" + item.text.trim().slice(0, 60) + "”" : item.kind === "image" ? "a picture" : item.files.length + " file" + (item.files.length > 1 ? "s" : "");
+    $("toast").textContent = "📥 Laptop sent " + what + ". Tap to open.";
+    $("toast").classList.remove("hidden");
+    clearTimeout(onOutbox.t); onOutbox.t = setTimeout(() => $("toast").classList.add("hidden"), 8000);
+  }
+}
+async function saveFiles(files, btn) {
+  try {
+    const fs = await Promise.all(files);
+    if (navigator.canShare && navigator.canShare({ files: fs })) { await navigator.share({ files: fs }); return; }
+    fs.forEach(f => { const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); });
+  } catch (e) { if (e.name !== "AbortError") shareMsg("Couldn't save: " + (e.message || e)); }
+}
+function button(label, fn) { const b = document.createElement("button"); b.textContent = label; b.onclick = fn; return b; }
+function renderInbox() {
+  const box = $("inbox"); box.innerHTML = "";
+  if (!outbox) { box.innerHTML = '<div class="empty">Nothing yet. On the laptop, select text or files (or copy a picture) and press <b>Alt+C</b>.</div>'; return; }
+  const btns = document.createElement("div"); btns.className = "btns";
+  if (outbox.kind === "text") {
+    const t = document.createElement("div"); t.className = "cliptext"; t.textContent = outbox.text; box.appendChild(t);
+    const b = button("Copy", async () => {
+      try { await navigator.clipboard.writeText(outbox.text); b.textContent = "Copied ✓"; } catch { shareMsg("Copy blocked. Press and hold the text to copy it."); }
+    });
+    btns.appendChild(b);
+  } else if (outbox.kind === "image") {
+    const img = document.createElement("img"); box.appendChild(img);
+    outFiles[0].then(f => img.src = URL.createObjectURL(f)).catch(() => shareMsg("Couldn't download the picture."));
+    const c = button("Copy", async () => {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": outFiles[0].then(f => new Blob([f], { type: "image/png" })) })]);
+        c.textContent = "Copied ✓";
+      } catch { shareMsg("Copy blocked. Use Save instead."); }
+    });
+    btns.append(c, button("Save…", (e) => saveFiles([outFiles[0]])));
+  } else {
+    outbox.files.forEach((f, i) => {
+      const r = document.createElement("div"); r.className = "frow";
+      const n = document.createElement("span"); n.textContent = f.name;
+      const z = document.createElement("small"); z.textContent = fmtSize(f.size);
+      r.append(n, z, button("Save…", () => saveFiles([outFiles[i]]))); box.appendChild(r);
+    });
+    if (outbox.files.length > 1) btns.appendChild(button("Save all…", () => saveFiles(outFiles)));
+  }
+  box.appendChild(btns);
+}
+function openShare() {
+  $("toast").classList.add("hidden");
+  if (outbox) store.set("pr_seen", outbox.id);
+  shareMsg(""); $("paste-fallback").classList.add("hidden");
+  renderInbox(); $("sharesheet").classList.remove("hidden");
+}
+$("share-btn").onclick = openShare;
+$("toast").onclick = openShare;
+$("share-close").onclick = () => $("sharesheet").classList.add("hidden");
+
+// Phone -> laptop clipboard.
+async function postClip(body, type) {
+  const r = await fetch("/api/clipboard", { method: "POST", headers: { "Content-Type": type, Authorization: "Bearer " + token }, body });
+  if (!r.ok) throw new Error(r.status);
+}
+$("paste-to-pc").onclick = async () => {
+  shareMsg("");
+  try {
+    let sent = false;
+    if (navigator.clipboard.read) {
+      const items = await navigator.clipboard.read();
+      for (const it of items) {
+        const img = it.types.find(t => t.startsWith("image/"));
+        if (img) { await postClip(await it.getType(img), img); shareMsg("Picture is on the laptop clipboard. Ctrl+V to paste."); sent = true; break; }
+        if (it.types.includes("text/plain")) {
+          await postClip(await (await it.getType("text/plain")).text(), "text/plain; charset=utf-8");
+          shareMsg("Text is on the laptop clipboard. Ctrl+V to paste."); sent = true; break;
+        }
+      }
+    } else {
+      const t = await navigator.clipboard.readText();
+      if (t) { await postClip(t, "text/plain; charset=utf-8"); shareMsg("Text is on the laptop clipboard. Ctrl+V to paste."); sent = true; }
+    }
+    if (!sent) shareMsg("Phone clipboard is empty.");
+  } catch {
+    $("paste-fallback").classList.remove("hidden"); $("paste-box").focus();
+    shareMsg("Couldn't read the clipboard directly. Paste below instead.");
+  }
+};
+$("paste-send").onclick = async () => {
+  const t = $("paste-box").value; if (!t) return;
+  try { await postClip(t, "text/plain; charset=utf-8"); $("paste-box").value = ""; $("paste-fallback").classList.add("hidden"); shareMsg("Text is on the laptop clipboard. Ctrl+V to paste."); }
+  catch { shareMsg("Can't reach the laptop."); }
+};
+
+// Phone -> laptop files. No "accept" filter, so iOS offers Photo Library, Take Photo and Choose Files.
+$("pick-files").onclick = () => $("file-in").click();
+$("file-in").onchange = () => {
+  const files = [...$("file-in").files]; if (!files.length) return;
+  const fd = new FormData(); files.forEach(f => fd.append("file", f, f.name));
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/upload"); xhr.setRequestHeader("Authorization", "Bearer " + token);
+  xhr.upload.onprogress = (e) => { if (e.lengthComputable) shareMsg(`Sending ${files.length} file${files.length > 1 ? "s" : ""}… ${Math.round(100 * e.loaded / e.total)}%`); };
+  xhr.onload = () => {
+    try { const j = JSON.parse(xhr.responseText); shareMsg("Saved on the laptop in " + j.folder.split("/").pop() + ": " + j.saved.join(", ")); }
+    catch { shareMsg("Upload failed (" + xhr.status + ")."); }
+  };
+  xhr.onerror = () => shareMsg("Upload failed. Same Wi-Fi?");
+  shareMsg("Sending…"); xhr.send(fd); $("file-in").value = "";
+};
+
+// ---------- shut down ----------
+let powerForce = false;
+function powerReset(msg) {
+  powerForce = false;
+  $("power-msg").textContent = msg;
+  $("power-go").textContent = "Shut down"; $("power-go").disabled = false; $("power-cancel").disabled = false;
+}
+$("power-btn").onclick = async () => {
+  powerReset("Open apps get closed first, like clicking their ✕.");
+  $("powersheet").classList.remove("hidden");
+  try {
+    const n = [...new Set((await api("/api/windows")).windows.map(w => w.name))];
+    if (n.length) $("power-msg").textContent = "Open: " + n.join(", ") + ". They get closed first, like clicking their ✕.";
+  } catch {}
+};
+$("power-cancel").onclick = () => $("powersheet").classList.add("hidden");
+$("power-go").onclick = async () => {
+  $("power-go").disabled = true; $("power-cancel").disabled = true;
+  $("power-msg").textContent = powerForce ? "Shutting down…" : "Closing apps… (up to 30 s)";
+  let j;
+  try { j = await api("/api/shutdown", { force: powerForce }); }
+  catch { powerReset("Can't reach the laptop. Try again."); return; }
+  if (j.ok) { $("power-msg").textContent = "Shutting down. Bye!"; $("power-go").textContent = "Shutting down…"; return; }
+  powerReset("Still open: " + [...new Set(j.stuck.map(w => w.name))].join(", ") +
+    ". Probably a “save changes?” prompt on the laptop. Shutting down anyway may lose unsaved work.");
+  powerForce = true;
+  $("power-go").textContent = "Shut down anyway";
+};
+
+// ---------- trackpad ----------
+const pad = $("pad");
+let touches = {}, startT = 0, moved = 0, maxFingers = 0, accX = 0, accY = 0, accS = 0, accSX = 0;
+let holdTimer = null, dragging = false, pendX = 0, pendY = 0, rafOn = false;
+function flushMove() {
+  rafOn = false;
+  const dx = Math.trunc(pendX), dy = Math.trunc(pendY);
+  if (dx || dy) { send({ t: "move", dx, dy }); pendX -= dx; pendY -= dy; }
+}
+function queueMove(dx, dy) { pendX += dx; pendY += dy; if (!rafOn) { rafOn = true; requestAnimationFrame(flushMove); } }
+
+pad.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  for (const t of e.changedTouches) touches[t.identifier] = { x: t.clientX, y: t.clientY };
+  const n = Object.keys(touches).length;
+  if (n === 1) { startT = performance.now(); moved = 0; maxFingers = 1; accS = 0; accSX = 0;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => { if (moved < 8) { dragging = true; pad.classList.add("drag"); send({ t: "button", b: 1, down: true }); } }, 450);
+  }
+  maxFingers = Math.max(maxFingers, n);
+  if (n > 1) clearTimeout(holdTimer);
+}, { passive: false });
+
+pad.addEventListener("touchmove", (e) => {
+  e.preventDefault();
+  const n = Object.keys(touches).length;
+  let sx = 0, sy = 0, c = 0;
+  for (const t of e.changedTouches) {
+    const p = touches[t.identifier]; if (!p) continue;
+    sx += t.clientX - p.x; sy += t.clientY - p.y; c++;
+    p.x = t.clientX; p.y = t.clientY;
+  }
+  if (!c) return;
+  sx /= c; sy /= c;
+  moved += Math.abs(sx) + Math.abs(sy);
+  if (moved >= 8) clearTimeout(holdTimer);
+  if (n === 1) {
+    const v = Math.hypot(sx, sy);
+    const gain = prefs.speed * (1 + Math.min(v, 40) / 10);
+    queueMove(sx * gain, sy * gain);
+  } else if (n === 2) {
+    const dir = prefs.natural ? -1 : 1;
+    accS += dir * sy * prefs.sspeed / 14; accSX += dir * sx * prefs.sspeed / 14;
+    const dy = Math.trunc(accS), dx = Math.trunc(accSX);
+    if (dy || dx) { send({ t: "scroll", dx, dy }); accS -= dy; accSX -= dx; }
+  }
+}, { passive: false });
+
+function endTouch(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) delete touches[t.identifier];
+  if (Object.keys(touches).length) return;
+  clearTimeout(holdTimer);
+  if (dragging) { dragging = false; pad.classList.remove("drag"); send({ t: "button", b: 1, down: false }); return; }
+  if (performance.now() - startT < 260 && moved < 10) send({ t: "click", b: maxFingers >= 2 ? 3 : 1 });
+}
+pad.addEventListener("touchend", endTouch, { passive: false });
+pad.addEventListener("touchcancel", endTouch, { passive: false });
+
+// Mouse fallback so the page can be tried from a desktop browser too.
+let mdown = false;
+pad.addEventListener("mousedown", () => mdown = true);
+window.addEventListener("mouseup", () => mdown = false);
+pad.addEventListener("mousemove", (e) => { if (mdown) queueMove(e.movementX, e.movementY); });
+
+$("lclick").onclick = () => send({ t: "click", b: 1 });
+$("rclick").onclick = () => send({ t: "click", b: 3 });
+// Side buttons 8/9: same codes a Logitech MX Master's back/forward buttons send.
+$("back").onclick = () => send({ t: "click", b: 8 });
+$("fwd").onclick = () => send({ t: "click", b: 9 });
+
+// Thumb wheel: one-finger horizontal swipe = horizontal scroll.
+const wheel = $("wheel");
+let wheelX = null, wheelAcc = 0;
+function wheelMove(x) {
+  if (wheelX === null) return;
+  wheelAcc += (prefs.natural ? -1 : 1) * (x - wheelX) * prefs.sspeed / 14;
+  wheelX = x;
+  const dx = Math.trunc(wheelAcc);
+  if (dx) { send({ t: "scroll", dx, dy: 0 }); wheelAcc -= dx; }
+}
+wheel.addEventListener("touchstart", (e) => { e.preventDefault(); wheelX = e.touches[0].clientX; wheelAcc = 0; }, { passive: false });
+wheel.addEventListener("touchmove", (e) => { e.preventDefault(); wheelMove(e.touches[0].clientX); }, { passive: false });
+wheel.addEventListener("touchend", () => wheelX = null);
+wheel.addEventListener("mousedown", (e) => { wheelX = e.clientX; wheelAcc = 0; });
+window.addEventListener("mousemove", (e) => wheelMove(e.clientX));
+window.addEventListener("mouseup", () => wheelX = null);
+
+// ---------- keyboard ----------
+const sink = $("sink");
+const SENTINEL = "​​";
+const mods = new Set();
+function resetSink() { sink.value = SENTINEL; sink.setSelectionRange(2, 2); }
+function sendKey(k) {
+  if (mods.size) { send({ t: "keys", keys: [...mods, k] }); clearMods(); }
+  else send({ t: "keys", keys: [k] });
+}
+function clearMods() { mods.clear(); document.querySelectorAll("[data-mod]").forEach(b => b.classList.remove("on")); }
+$("kbd-btn").onclick = () => { resetSink(); sink.focus(); };
+sink.addEventListener("beforeinput", (e) => {
+  e.preventDefault();
+  const type = e.inputType;
+  if (type === "insertText" || type === "insertReplacementText" || type === "insertFromPaste") {
+    const text = e.data ?? (e.dataTransfer && e.dataTransfer.getData("text/plain")) ?? "";
+    if (!text) return;
+    if (mods.size && text.length === 1) sendKey(text.toLowerCase());
+    else send({ t: "text", s: text });
+  } else if (type === "deleteContentBackward" || type === "deleteWordBackward") {
+    sendKey("backspace");
+  } else if (type === "insertLineBreak" || type === "insertParagraph") {
+    sendKey("enter");
+  }
+  resetSink();
+});
+// Fallback for browsers without beforeinput: diff the value.
+sink.addEventListener("input", () => {
+  const v = sink.value.replace(/​/g, "");
+  if (v) send({ t: "text", s: v });
+  else if (sink.value.length < 2) sendKey("backspace");
+  resetSink();
+});
+document.querySelectorAll("[data-mod]").forEach(b => b.onclick = () => {
+  const m = b.dataset.mod;
+  if (mods.has(m)) { mods.delete(m); b.classList.remove("on"); } else { mods.add(m); b.classList.add("on"); }
+});
+document.querySelectorAll("[data-k]").forEach(b => b.onclick = () => sendKey(b.dataset.k));
+
+// ---------- settings ----------
+$("speed").value = prefs.speed; $("sspeed").value = prefs.sspeed; $("natural").checked = prefs.natural;
+$("speed").oninput = (e) => { prefs.speed = +e.target.value; store.set("pr_speed", e.target.value); };
+$("sspeed").oninput = (e) => { prefs.sspeed = +e.target.value; store.set("pr_sspeed", e.target.value); };
+$("natural").onchange = (e) => { prefs.natural = e.target.checked; store.set("pr_natural", e.target.checked ? "1" : "0"); };
+$("settings-btn").onclick = () => $("settings").classList.remove("hidden");
+$("settings-close").onclick = () => $("settings").classList.add("hidden");
+$("unpair").onclick = () => { store.del("pr_token"); token = ""; if (ws) { ws.onclose = null; ws.close(); } $("settings").classList.add("hidden"); connect(); };
+
+connect();
+</script>
+</body>
+</html>
